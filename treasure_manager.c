@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     if (strcmp(argv[1], "--add") == 0) {
         add_treasure(argv[2]);
     } else if (strcmp(argv[1], "--list") == 0) {
-        //list_treasures(argv[2]);
+        list_treasures(argv[2]);
     } else if (strcmp(argv[1], "--view") == 0) {
         if (argc < 4) {
             fprintf(stderr, "Missing treasure ID\n");
@@ -57,9 +57,9 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "Missing treasure ID\n");
             exit(EXIT_FAILURE);
         }
-        //remove_treasure(argv[2], atoi(argv[3]));
+        remove_treasure(argv[2], atoi(argv[3]));
     } else if (strcmp(argv[1], "--remove_hunt") == 0) {
-        //remove_hunt(argv[2]);
+        remove_hunt(argv[2]);
     } else {
         fprintf(stderr, "Unknown command\n");
         exit(EXIT_FAILURE);
@@ -167,6 +167,41 @@ void add_treasure(const char* hunt_id) {
     printf("Treasure added successfully.\n");
 }
 
+void list_treasures(const char *hunt_id) {
+    char file_path[MAX_PATH];
+    snprintf(file_path, sizeof(file_path), "%s/treasures.dat", hunt_id);
+
+    // Check if the file exists
+    struct stat st;
+    if (stat(file_path, &st) == -1) {
+        perror("stat");
+        return;
+    }
+
+    // Print hunt details
+    printf("Hunt: %s\n"
+           "File Size: %ld bytes\n"
+           "Last Modified: %s", hunt_id, st.st_size, ctime(&st.st_mtime));
+
+    // Read and list treasures
+    int fd = open(file_path, O_RDONLY);
+    if (fd == -1) {
+        perror("open (treasures.dat)");
+        return;
+    }
+
+    Treasure t;
+    while (read(fd, &t, sizeof(Treasure)) == sizeof(Treasure)) {
+        printf("\nTreasure ID: %d\n"
+               "Username: %s\n"
+               "Coordinates: %.2f, %.2f\n"
+               "Clue: %s\n"
+               "Value: %d\n", t.treasure_id, t.username, t.latitude, t.longitude, t.clue, t.value);
+    }
+
+    close(fd);
+}
+
 void view_treasure(const char *hunt_id, int treasure_id) {
     char file_path[MAX_PATH];
     snprintf(file_path, sizeof(file_path), "%s/treasures.dat", hunt_id);
@@ -192,4 +227,79 @@ void view_treasure(const char *hunt_id, int treasure_id) {
 
     printf("Treasure with ID %d not found.\n", treasure_id);
     close(fd);
+}
+
+void remove_treasure(const char *hunt_id, int treasure_id) {
+    char file_path[MAX_PATH];
+    snprintf(file_path, sizeof(file_path), "%s/treasures.dat", hunt_id);
+
+    int fd = open(file_path, O_RDWR);
+    if (fd == -1) {
+        perror("open (treasures.dat)");
+        return;
+    }
+
+    // Temporary file to store updated treasures
+    char temp_path[MAX_PATH];
+    snprintf(temp_path, sizeof(temp_path), "%s/temp_treasures.dat", hunt_id);
+    int temp_fd = open(temp_path, O_WRONLY | O_CREAT, 0644);
+    if (temp_fd == -1) {
+        perror("open (temp file)");
+        close(fd);
+        return;
+    }
+
+    Treasure t;
+    int treasure_found = 0;
+    while (read(fd, &t, sizeof(Treasure)) == sizeof(Treasure)) {
+        if (t.treasure_id == treasure_id) {
+            treasure_found = 1;  // Skipping the treasure to remove it
+            continue;
+        }
+        write(temp_fd, &t, sizeof(Treasure));
+    }
+
+    if (!treasure_found) {
+        printf("Treasure with ID %d not found.\n", treasure_id);
+    } else {
+        printf("Treasure with ID %d removed successfully.\n", treasure_id);
+        // Replace the old file with the new file
+        remove(file_path);
+        rename(temp_path, file_path);
+    }
+
+    close(fd);
+    close(temp_fd);
+}
+
+void remove_hunt(const char *hunt_id) {
+    char file_path[MAX_PATH];
+
+    // Remove known files in the hunt directory
+    const char *files[] = {
+        "treasures.dat",
+        "logged_hunt",
+        "temp_treasures.dat" // optional, cleanup if it exists
+    };
+
+    for (int i = 0; i < sizeof(files)/sizeof(files[0]); i++) {
+        snprintf(file_path, sizeof(file_path), "%s/%s", hunt_id, files[i]);
+        unlink(file_path);  // silently try to remove
+    }
+
+    // Remove the hunt directory
+    if (rmdir(hunt_id) == -1) {
+        perror("rmdir");
+        return;
+    }
+
+    // Remove symlink
+    char link_name[MAX_PATH];
+    snprintf(link_name, sizeof(link_name), "logged_hunt-%s", hunt_id);
+    if (unlink(link_name) == -1) {
+        if (errno != ENOENT)
+            perror("unlink (symlink)");
+    }
+
+    printf("Hunt '%s' removed.\n", hunt_id);
 }
