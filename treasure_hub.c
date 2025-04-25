@@ -35,13 +35,14 @@ void start_monitor() {
     }
 
     if (monitor_pid == 0) { // child process
-        execl("./monitor", "monitor", NULL); // must have compiled monitor.c as monitor to work
-        perror("execl");
-        exit(EXIT_FAILURE);
+        if (execl("./monitor", "monitor", NULL) < 0) { // must have compiled monitor.c as monitor to work
+            perror("execl");
+            exit(EXIT_FAILURE);
+        }
     }
 
     monitor_running = 1;
-    printf("Monitor started\n");
+    printf("Monitor started. PID: %d\n", monitor_pid);
 }
 
 
@@ -52,17 +53,20 @@ void send_command(char *command) {
     }
 
     // this file is used to give monitor the command
-    int fd = open(CMD_FILE, O_RDWR | O_CREAT, 0644);
+    int fd = open(CMD_FILE, O_WRONLY | O_CREAT, 0644);
     if (fd == -1) {
         perror("open");
         exit(EXIT_FAILURE);
     }
 
+    // truncate needed if you give a command followed by a shorter command
+    truncate(CMD_FILE, 0);
+
     // write command to file, in order to let monitor know what to do next
     if (write(fd, command, strlen(command)) != strlen(command)) {
         perror("write");
         close(fd);
-        exit(EXIT_FAILURE);
+        return;
     }
 
     close(fd);
@@ -89,27 +93,31 @@ int main() {
     sa.sa_handler = handle_sigchld;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGCHLD, &sa, NULL);
+    if (sigaction(SIGCHLD, &sa, NULL) < 0) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     char input[MAX_CMD_LEN];
 
     printf("Commands:\n"
            "start_monitor\n"
+           "exit\n\n"
+           "Monitor Commands:\n"
+           "stop_monitor\n"
            "list_hunts\n"
            "list_treasures\n"
-           "view_treasure\n"
-           "stop_monitor\n"
-           "exit\n\n");
-    
+           "view_treasure\n\n");
+
+    printf("Input commands:\n");
+    fflush(stdout);
+
     // stop_monitor, list_hunts, list_treasures, view_treasure 
     //commands will be sent to monitor process
+
     while(1) {
         // read command
-        printf("Input command: ");
-        fflush(stdout);
-        if (!fgets(input, sizeof(input), stdin)) {
-            break;
-        }
+        fgets(input, sizeof(input), stdin);
         input[strcspn(input, "\n")] = 0; // remove newline
 
         // handle each possible command
@@ -121,12 +129,12 @@ int main() {
             if (monitor_running) {
                 printf("Monitor still running! Use stop_monitor first.\n");
             } else {
-                break; // TODO exit command here
+                return 0;
             }
         } else if (strncmp(input, "list_hunts", 10) == 0 ||
                    strncmp(input, "list_treasures", 14) == 0 ||
                    strncmp(input, "view_treasure", 13) == 0) {
-            //send_command(input);
+            send_command(input);
         } else {
             printf("Unknown command.\n");
         }
@@ -134,3 +142,6 @@ int main() {
 
     return 0;
 }
+
+// TODO program only stops when exit is inputted kinda done, doesn't work if fgets has error handling
+// TODO chestia cu stop_monitor usleep error din cerinta
