@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include "monitor_functions.h"
 
 #define CMD_FILE "monitor_command.txt"
 #define MAX_CMD_LEN 256
@@ -13,7 +14,7 @@ int got_command = 0;
 
 
 void monitor_loop() {
-    char command[MAX_CMD_LEN];
+    char full_command[MAX_CMD_LEN];
 
     while (1) {
         // wait for command
@@ -27,29 +28,33 @@ void monitor_loop() {
             }
 
             // for clearing old commands
-            memset(command, 0, MAX_CMD_LEN);
+            memset(full_command, 0, MAX_CMD_LEN);
 
-            if (read(fd, command, MAX_CMD_LEN) < 0) {
+            if (read(fd, full_command, MAX_CMD_LEN) < 0) {
                 perror("read");
                 exit(EXIT_FAILURE);
             }
 
             close(fd);
 
+            char* command = strtok(full_command, " ");
+            char* arg1 = strtok(NULL, " ");
+            char* arg2 = strtok(NULL, " ");
+
             if (strcmp(command, "stop_monitor") == 0) {
                 printf("Monitor: Stopping with delay\n");
-                usleep(5000000); // simulate delay: 5 seconds
+                usleep(2000000); // simulate delay: 2 seconds
                 printf("Monitor: Stopped\n");
                 exit(EXIT_SUCCESS);
             } else if (strcmp(command, "list_hunts") == 0) {
                 printf("Monitor: Listing hunts (placeholder).\n");
-                // TODO: Implement actual hunt listing using treasure_manager code
-            } else if (strncmp(command, "list_treasures", 14) == 0) {
-                printf("Monitor: Listing treasures in hunt (placeholder).\n");
-            } else if (strncmp(command, "view_treasure", 13) == 0) {
-                printf("Monitor: Viewing treasure (placeholder).\n");
+                list_hunts();
+            } else if (strncmp(command, "list_treasures", 14) == 0 && arg1) {
+                list_treasures(arg1);
+            } else if (strncmp(command, "view_treasure", 13) == 0 && arg1 && arg2) {
+                view_treasure(arg1, atoi(arg2));
             } else {
-                printf("Monitor: Unknown command: %s\n", command);
+                printf("Monitor: Unknown command: %s\n", full_command);
             }
         }
         pause();

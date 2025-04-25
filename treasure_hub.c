@@ -11,6 +11,7 @@
 #define MAX_CMD_LEN 256
 
 int monitor_running = 0;
+int stop_monitor_called_and_not_finished = 0;
 pid_t monitor_pid = -1;
 
 
@@ -18,6 +19,7 @@ void handle_sigchld(int sig) {
     int status;
     waitpid(monitor_pid, &status, 0); // after this function call the monitor process ends
     monitor_running = 0;
+    stop_monitor_called_and_not_finished = 0;
     printf("Monitor process ended. Status: %d\n", status);
 }
 
@@ -82,8 +84,8 @@ void stop_monitor() {
         return;
     }
 
+    stop_monitor_called_and_not_finished = 1;
     send_command("stop_monitor");
-    // Let SIGCHLD handle the rest
 }
 
 
@@ -103,11 +105,12 @@ int main() {
     printf("Commands:\n"
            "start_monitor\n"
            "exit\n\n"
+
            "Monitor Commands:\n"
            "stop_monitor\n"
            "list_hunts\n"
-           "list_treasures\n"
-           "view_treasure\n\n");
+           "list_treasures <hunt id>\n"
+           "view_treasure <hunt id> <treasure id>\n\n");
 
     printf("Input commands:\n");
     fflush(stdout);
@@ -119,6 +122,10 @@ int main() {
         // read command
         fgets(input, sizeof(input), stdin);
         input[strcspn(input, "\n")] = 0; // remove newline
+        
+        if (stop_monitor_called_and_not_finished) {
+            fprintf(stderr, "Error: monitor still closing\n");
+        }
 
         // handle each possible command
         if (strcmp(input, "start_monitor") == 0) {
@@ -143,5 +150,7 @@ int main() {
     return 0;
 }
 
-// TODO program only stops when exit is inputted kinda done, doesn't work if fgets has error handling
-// TODO chestia cu stop_monitor usleep error din cerinta
+// TODO program only stops when exit is inputted (doesn't work if fgets has error handling)
+
+// TODO chestia cu stop_monitor usleep error din cerinta 
+// (works but monitor closes right after inputting the command while monitor is closing) idk why
