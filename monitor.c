@@ -47,7 +47,6 @@ void monitor_loop() {
                 printf("Monitor: Stopped\n");
                 exit(EXIT_SUCCESS);
             } else if (strcmp(command, "list_hunts") == 0) {
-                printf("Monitor: Listing hunts (placeholder).\n");
                 list_hunts();
             } else if (strncmp(command, "list_treasures", 14) == 0 && arg1) {
                 list_treasures(arg1);

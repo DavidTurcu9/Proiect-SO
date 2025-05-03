@@ -20,7 +20,10 @@ void handle_sigchld(int sig) {
     waitpid(monitor_pid, &status, 0); // after this function call the monitor process ends
     monitor_running = 0;
     stop_monitor_called_and_not_finished = 0;
-    printf("Monitor process ended. Status: %d\n", status);
+    if (WIFEXITED(status)) {
+        int exit_code = WEXITSTATUS(status);
+        printf("Monitor process ended. Status: %d\n", exit_code);
+    }
 }
 
 
@@ -125,6 +128,7 @@ int main() {
         
         if (stop_monitor_called_and_not_finished) {
             fprintf(stderr, "Error: monitor still closing\n");
+            continue;
         }
 
         // handle each possible command
@@ -145,12 +149,11 @@ int main() {
         } else {
             printf("Unknown command.\n");
         }
+
     }
 
     return 0;
 }
 
 // TODO program only stops when exit is inputted (doesn't work if fgets has error handling)
-
-// TODO chestia cu stop_monitor usleep error din cerinta 
-// (works but monitor closes right after inputting the command while monitor is closing) idk why
+// when stopping the monitor the program goes into the fgets error code
