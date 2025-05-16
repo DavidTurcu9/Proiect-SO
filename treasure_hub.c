@@ -13,7 +13,7 @@
 int monitor_running = 0;
 int stop_monitor_called_and_not_finished = 0;
 pid_t monitor_pid = -1;
-
+int monitor_pipe_fd[2];
 
 void handle_sigchld(int sig) {
     int status;
@@ -33,6 +33,11 @@ void start_monitor() {
         return;
     }
 
+    if (pipe(monitor_pipe_fd) == -1) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
     monitor_pid = fork();
     if (monitor_pid == -1) { // fork error handling
         perror("fork");
@@ -40,14 +45,21 @@ void start_monitor() {
     }
 
     if (monitor_pid == 0) { // child process
+        // Child: replace stdout with write-end of pipe
+        close(monitor_pipe_fd[0]); // close read end
+        dup2(monitor_pipe_fd[1], STDOUT_FILENO); // send all printf to pipe
         if (execl("./monitor", "monitor", NULL) < 0) { // must have compiled monitor.c as monitor to work
             perror("execl");
             exit(EXIT_FAILURE);
         }
+        close(monitor_pipe_fd[1]);
     }
 
-    monitor_running = 1;
-    printf("Monitor started. PID: %d\n", monitor_pid);
+    if (monitor_pid > 0) {
+        close(monitor_pipe_fd[1]);
+        monitor_running = 1;
+        printf("Monitor started. PID: %d\n", monitor_pid);
+    }
 }
 
 
@@ -76,8 +88,15 @@ void send_command(char *command) {
 
     close(fd);
 
-
     kill(monitor_pid, SIGUSR1); // Notify monitor to process command
+
+    // read monitor output
+    char buffer[1024];
+    ssize_t nbytes = read(monitor_pipe_fd[0], buffer, sizeof(buffer) - 1);
+    if (nbytes > 0) {
+        buffer[nbytes] = '\0';
+        printf("%s", buffer); // Show monitor's response
+    }
 }
 
 
@@ -140,6 +159,7 @@ int main() {
             if (monitor_running) {
                 printf("Monitor still running! Use stop_monitor first.\n");
             } else {
+                close(monitor_pipe_fd[0]);
                 return 0;
             }
         } else if (strncmp(input, "list_hunts", 10) == 0 ||

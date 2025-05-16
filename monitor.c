@@ -43,6 +43,7 @@ void monitor_loop() {
 
             if (strcmp(command, "stop_monitor") == 0) {
                 printf("Monitor: Stopping with delay\n");
+                fflush(stdout);
                 usleep(2000000); // simulate delay: 2 seconds
                 printf("Monitor: Stopped\n");
                 exit(EXIT_SUCCESS);
@@ -56,6 +57,7 @@ void monitor_loop() {
                 printf("Monitor: Unknown command: %s\n", full_command);
             }
         }
+        fflush(stdout);
         pause();
     }
 }
@@ -79,7 +81,8 @@ int main() {
         exit(EXIT_FAILURE);
     }
 
-    printf("Monitor running (PID: %d). Waiting for commands...\n", getpid());
+    //printf("Monitor running (PID: %d). Waiting for commands...\n", getpid());
+    fflush(stdout);
     monitor_loop();
 
     return 0;
