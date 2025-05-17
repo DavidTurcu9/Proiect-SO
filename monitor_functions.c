@@ -99,6 +99,12 @@ void view_treasure(char *hunt_id, int treasure_id) {
     char file_path[MAX_PATH];
     snprintf(file_path, MAX_PATH, "%s/treasures.dat", hunt_id);
 
+    struct stat st;
+    if (stat(file_path, &st) == -1) {
+        perror("file doesn't exist");
+        return;
+    }
+
     int fd = open(file_path, O_RDONLY);
     if (fd == -1) {
         perror("open (treasures.dat)");

@@ -12,7 +12,7 @@
 #define CMD_FILE "monitor_command.txt"
 #define MAX_PATH 512
 #define MAX_CMD_LEN 256
-#define MAX_MONITOR_OUTPUT_LEN 2048
+#define MAX_OUTPUT_LEN 2048
 #define MAX_HUNT_NAME_LEN 128
 #define TREASURE_FILE_NAME "treasures.dat"
 
@@ -101,7 +101,7 @@ void send_command(char *command) {
     kill(monitor_pid, SIGUSR1); // Notify monitor to process command
 
     // read monitor output
-    char buffer[MAX_MONITOR_OUTPUT_LEN];
+    char buffer[MAX_OUTPUT_LEN];
     ssize_t nbytes = read(monitor_pipe_fd[0], buffer, sizeof(buffer) - 1);
     if (nbytes > 0) {
         buffer[nbytes] = '\0';
@@ -118,6 +118,7 @@ void stop_monitor() {
 
     stop_monitor_called_and_not_finished = 1;
     send_command("stop_monitor");
+    close(monitor_pipe_fd[0]);
 }
 
 
@@ -141,7 +142,7 @@ void calculate_score() {
             strcmp(hunt_dir_name, "..") != 0) {
 
             char treasure_dat_path[MAX_PATH];
-            snprintf(treasure_dat_path, MAX_PATH, "%s/%s", entry->d_name, TREASURE_FILE_NAME);
+            snprintf(treasure_dat_path, MAX_PATH, "%s/%s", hunt_dir_name, TREASURE_FILE_NAME);
 
             if (stat(treasure_dat_path, &st) == 0) {
                 int calc_pipe_fd[2];
@@ -160,7 +161,7 @@ void calculate_score() {
 
                 if (calc_pid == 0) { // child process
                     close(calc_pipe_fd[0]); // close read
-                    //dup2(calc_pipe_fd[1], STDOUT_FILENO);
+                    dup2(calc_pipe_fd[1], STDOUT_FILENO);
                     if (execl("./calculate_score_exec", "calculate_score", hunt_dir_name, NULL) < 0) {
                         perror("execl");
                         exit(EXIT_FAILURE);
@@ -175,14 +176,20 @@ void calculate_score() {
                     // se citeste raspuns de la child process de genul
                     // user "username" has a score of "calculated_score"
                     // si se afiseaza
+                    char buffer[MAX_OUTPUT_LEN];
+                    ssize_t nbytes = read(calc_pipe_fd[0], buffer, sizeof(buffer) - 1);
+                    if (nbytes > 0) {
+                        buffer[nbytes] = '\0';
+                        printf("%s", buffer); // Show monitor's response
+                    }
 
                     // end calculate_score process
                     int calc_status;
                     waitpid(calc_pid, &calc_status, 0); // after this function call the calculate_score process ends
-                    if (WIFEXITED(calc_status)) {
+                    /*if (WIFEXITED(calc_status)) {
                         int calc_exit_code = WEXITSTATUS(calc_status);
                         //printf("calculate_score process ended. Status: %d\n", calc_exit_code);
-                    }
+                    }*/
                     calculate_score_running = 0;
                     close(calc_pipe_fd[0]); // close read
                 }
@@ -241,7 +248,6 @@ int main() {
             if (monitor_running) {
                 printf("Monitor still running! Use stop_monitor first.\n");
             } else {
-                close(monitor_pipe_fd[0]);
                 return 0;
             }
         } else if (strncmp(input, "list_hunts", 10) == 0 ||
