@@ -64,7 +64,7 @@ void list_treasures(char *hunt_id) {
 
     struct stat st;
     if (stat(dat_path, &st) == -1) {
-        perror("file doesn't exist");
+        printf("File doesn't exist error\n");
         return;
     }
 
@@ -76,7 +76,7 @@ void list_treasures(char *hunt_id) {
     // Read and list treasures
     int fd = open(dat_path, O_RDONLY);
     if (fd == -1) {
-        perror("open (treasures.dat)");
+        printf("Open error\n");
         return;
     }
 
@@ -101,13 +101,13 @@ void view_treasure(char *hunt_id, int treasure_id) {
 
     struct stat st;
     if (stat(file_path, &st) == -1) {
-        perror("file doesn't exist");
+        printf("File doesn't exist error\n");
         return;
     }
 
     int fd = open(file_path, O_RDONLY);
     if (fd == -1) {
-        perror("open (treasures.dat)");
+        printf("Open error\n");
         return;
     }
 

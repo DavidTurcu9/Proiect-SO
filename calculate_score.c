@@ -27,7 +27,6 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // TODO: parse files related to the hunt and compute scores
     char hunt_dir_name[MAX_HUNT_NAME_LEN];
     strncpy(hunt_dir_name, argv[1], MAX_HUNT_NAME_LEN);
 
@@ -75,7 +74,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < total_users; i++) {
         printf("\tUser: %s, Score: %d\n", users[i], user_score[i]);
     }
-    
+
     fflush(stdout);
 
     return 0;

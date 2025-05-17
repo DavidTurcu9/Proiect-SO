@@ -23,8 +23,9 @@ int monitor_pipe_fd[2];
 int calculate_score_running = 0;
 
 void handle_sigchld(int sig) {
+    // if calculate_score ends SIGCHLD gets sent and if this if statement wasn't here
+    // that signal would mess up the monitor
     if (calculate_score_running == 0) {
-        printf("calc_score_running: %d\nmonitor_running: %d\n", calculate_score_running, monitor_running);
         int status;
         waitpid(monitor_pid, &status, 0); // after this function call the monitor process ends
         monitor_running = 0;
@@ -103,7 +104,7 @@ void send_command(char *command) {
     // read monitor output
     char buffer[MAX_OUTPUT_LEN];
     ssize_t nbytes = read(monitor_pipe_fd[0], buffer, sizeof(buffer) - 1);
-    if (nbytes > 0) {
+    if (nbytes >= 0) {
         buffer[nbytes] = '\0';
         printf("%s", buffer); // Show monitor's response
     }
@@ -131,7 +132,8 @@ void calculate_score() {
 
     struct dirent* entry;
     struct stat st;
-    
+    int treasures_found = 0;
+
     // goes through all hunt folders and creates calculate_score process for each
     while ((entry = readdir(dir)) != NULL) {
         char hunt_dir_name[MAX_HUNT_NAME_LEN];
@@ -143,8 +145,10 @@ void calculate_score() {
 
             char treasure_dat_path[MAX_PATH];
             snprintf(treasure_dat_path, MAX_PATH, "%s/%s", hunt_dir_name, TREASURE_FILE_NAME);
-
-            if (stat(treasure_dat_path, &st) == 0) {
+                
+            if (stat(treasure_dat_path, &st) == 0) { // daca exista fisierul treasures.dat intra in if
+                printf("%s\n", hunt_dir_name);
+                treasures_found = 1;
                 int calc_pipe_fd[2];
                 if (pipe(calc_pipe_fd) == -1) {
                     perror("pipe");
@@ -195,6 +199,9 @@ void calculate_score() {
                 }
             }
         }
+    }
+    if (treasures_found == 0) {
+        printf("No treasures found\n");
     }
 }
 
@@ -264,3 +271,6 @@ int main() {
 
     return 0;
 }
+
+
+// TODO test calcualte_score if no treasures exist
