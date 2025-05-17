@@ -41,13 +41,13 @@ void monitor_loop() {
             char* arg1 = strtok(NULL, " ");
             char* arg2 = strtok(NULL, " ");
 
-            if (strcmp(command, "stop_monitor") == 0) {
+            if (strncmp(command, "stop_monitor", 12) == 0) {
                 printf("Monitor: Stopping with delay\n");
                 fflush(stdout);
                 usleep(2000000); // simulate delay: 2 seconds
                 printf("Monitor: Stopped\n");
                 exit(EXIT_SUCCESS);
-            } else if (strcmp(command, "list_hunts") == 0) {
+            } else if (strncmp(command, "list_hunts", 10) == 0) {
                 list_hunts();
             } else if (strncmp(command, "list_treasures", 14) == 0 && arg1) {
                 list_treasures(arg1);

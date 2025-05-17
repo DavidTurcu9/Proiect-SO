@@ -6,23 +6,33 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
 #define CMD_FILE "monitor_command.txt"
+#define MAX_PATH 512
 #define MAX_CMD_LEN 256
+#define MAX_MONITOR_OUTPUT_LEN 2048
+#define MAX_HUNT_NAME_LEN 128
+#define TREASURE_FILE_NAME "treasures.dat"
 
 int monitor_running = 0;
 int stop_monitor_called_and_not_finished = 0;
 pid_t monitor_pid = -1;
 int monitor_pipe_fd[2];
+int calculate_score_running = 0;
 
 void handle_sigchld(int sig) {
-    int status;
-    waitpid(monitor_pid, &status, 0); // after this function call the monitor process ends
-    monitor_running = 0;
-    stop_monitor_called_and_not_finished = 0;
-    if (WIFEXITED(status)) {
-        int exit_code = WEXITSTATUS(status);
-        printf("Monitor process ended. Status: %d\n", exit_code);
+    if (calculate_score_running == 0) {
+        printf("calc_score_running: %d\nmonitor_running: %d\n", calculate_score_running, monitor_running);
+        int status;
+        waitpid(monitor_pid, &status, 0); // after this function call the monitor process ends
+        monitor_running = 0;
+        stop_monitor_called_and_not_finished = 0;
+        if (WIFEXITED(status)) {
+            int exit_code = WEXITSTATUS(status);
+            printf("Monitor process ended. Status: %d\n", exit_code);
+        }
     }
 }
 
@@ -91,7 +101,7 @@ void send_command(char *command) {
     kill(monitor_pid, SIGUSR1); // Notify monitor to process command
 
     // read monitor output
-    char buffer[1024];
+    char buffer[MAX_MONITOR_OUTPUT_LEN];
     ssize_t nbytes = read(monitor_pipe_fd[0], buffer, sizeof(buffer) - 1);
     if (nbytes > 0) {
         buffer[nbytes] = '\0';
@@ -111,6 +121,77 @@ void stop_monitor() {
 }
 
 
+void calculate_score() {
+    DIR* dir = opendir("."); // opens directory in which the hunts are located
+    if (dir == NULL) {
+        perror("opendir");
+        return;
+    }
+
+    struct dirent* entry;
+    struct stat st;
+    
+    // goes through all hunt folders and creates calculate_score process for each
+    while ((entry = readdir(dir)) != NULL) {
+        char hunt_dir_name[MAX_HUNT_NAME_LEN];
+        strncpy(hunt_dir_name, entry->d_name, MAX_HUNT_NAME_LEN);
+
+        if (entry->d_type == DT_DIR &&
+            strcmp(hunt_dir_name, ".") != 0 &&
+            strcmp(hunt_dir_name, "..") != 0) {
+
+            char treasure_dat_path[MAX_PATH];
+            snprintf(treasure_dat_path, MAX_PATH, "%s/%s", entry->d_name, TREASURE_FILE_NAME);
+
+            if (stat(treasure_dat_path, &st) == 0) {
+                int calc_pipe_fd[2];
+                if (pipe(calc_pipe_fd) == -1) {
+                    perror("pipe");
+                    exit(EXIT_FAILURE);
+                }
+
+                pid_t calc_pid = fork();
+                if (calc_pid < 0) {
+                    perror("fork");
+                    exit(EXIT_FAILURE);
+                }
+                
+                calculate_score_running = 1;
+
+                if (calc_pid == 0) { // child process
+                    close(calc_pipe_fd[0]); // close read
+                    //dup2(calc_pipe_fd[1], STDOUT_FILENO);
+                    if (execl("./calculate_score_exec", "calculate_score", hunt_dir_name, NULL) < 0) {
+                        perror("execl");
+                        exit(EXIT_FAILURE);
+                    }
+                    
+                    close(calc_pipe_fd[1]); // close write
+                }
+
+                if (calc_pid > 0) { // parent(treasure hub)
+                    close(calc_pipe_fd[1]); // close write
+
+                    // se citeste raspuns de la child process de genul
+                    // user "username" has a score of "calculated_score"
+                    // si se afiseaza
+
+                    // end calculate_score process
+                    int calc_status;
+                    waitpid(calc_pid, &calc_status, 0); // after this function call the calculate_score process ends
+                    if (WIFEXITED(calc_status)) {
+                        int calc_exit_code = WEXITSTATUS(calc_status);
+                        //printf("calculate_score process ended. Status: %d\n", calc_exit_code);
+                    }
+                    calculate_score_running = 0;
+                    close(calc_pipe_fd[0]); // close read
+                }
+            }
+        }
+    }
+}
+
+
 int main() {
     // call handle_sigchld once monitor process ended
     struct sigaction sa;
@@ -126,6 +207,7 @@ int main() {
 
     printf("Commands:\n"
            "start_monitor\n"
+           "calculate_score\n"
            "exit\n\n"
 
            "Monitor Commands:\n"
@@ -166,6 +248,8 @@ int main() {
                    strncmp(input, "list_treasures", 14) == 0 ||
                    strncmp(input, "view_treasure", 13) == 0) {
             send_command(input);
+        } else if (strncmp(input, "calculate_score", 15) == 0) {
+            calculate_score();
         } else {
             printf("Unknown command.\n");
         }
@@ -174,6 +258,3 @@ int main() {
 
     return 0;
 }
-
-// TODO program only stops when exit is inputted (doesn't work if fgets has error handling)
-// when stopping the monitor the program goes into the fgets error code

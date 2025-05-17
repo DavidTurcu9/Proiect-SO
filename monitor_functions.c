@@ -29,7 +29,7 @@ void list_hunts() {
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_DIR &&
             strcmp(entry->d_name, ".") != 0 &&
-            strcmp(entry->d_name, "..") != 0) {
+            strcmp(entry->d_name, "..") != 0) {  // daca nu e folderul curent sau precedent
 
             char treasure_dat_path[MAX_PATH];
             snprintf(treasure_dat_path, MAX_PATH, "%s/%s", entry->d_name, TREASURE_FILE_NAME);
