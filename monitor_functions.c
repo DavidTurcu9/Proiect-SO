@@ -25,6 +25,7 @@ void list_hunts() {
     struct dirent* entry;
     struct stat st;
 
+    int hunts_exist = 0;
 
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_DIR &&
@@ -35,6 +36,7 @@ void list_hunts() {
             snprintf(treasure_dat_path, MAX_PATH, "%s/%s", entry->d_name, TREASURE_FILE_NAME);
 
             if (stat(treasure_dat_path, &st) == 0) {  // daca exista fisierul treasures.dat intra in if
+                hunts_exist = 1;
                 int fd = open(treasure_dat_path, O_RDONLY);
                 if (fd < 0) {
                     continue;
@@ -53,6 +55,9 @@ void list_hunts() {
         }
     }
 
+    if (hunts_exist == 0) {
+        printf("No hunts found\n");
+    }
     printf("\n");
     closedir(dir);
 }

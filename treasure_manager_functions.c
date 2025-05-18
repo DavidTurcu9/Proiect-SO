@@ -251,5 +251,9 @@ void remove_hunt(const char *hunt_id) {
     if (rmdir(hunt_dir_path) == -1) {
         perror("rmdir");
         return;
+    } else {
+        printf("Hunt removed successfully\n");
     }
+
+
 }
